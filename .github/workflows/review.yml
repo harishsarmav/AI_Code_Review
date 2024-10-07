@@ -1,0 +1,18 @@
+name: AI Code Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run AI Code Reviewer
+      run: python3 review_script.py
+
+    - name: Post review comments
+      run: python3 post_comments.py
