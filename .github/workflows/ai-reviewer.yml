@@ -22,9 +22,7 @@ jobs:
         pip install requests
 
     - name: Debug PR URL
-      run: echo "PR URL: $GITHUB_PR_URL"
-      env:
-        GITHUB_PR_URL: ${{ github.event.pull_request.url }}  # Set PR URL here
+      run: echo "PR URL: ${{ github.event.pull_request.url }}"
 
     - name: Run AI Code Reviewer
       env:
