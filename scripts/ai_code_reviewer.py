@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import time
 
 # Fetch the PR diff using GitHub API
 def fetch_diff(pr_url, github_token):
