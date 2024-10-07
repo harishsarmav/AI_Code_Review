@@ -8,7 +8,7 @@ def fetch_diff(pr_url, github_token):
         'Authorization': f'token {github_token}',
         'Accept': 'application/vnd.github.v3.diff'
     }
-    response = requests.get(f'{pr_url}/files', headers=headers)
+    response = requests.get(pr_url + "/files", headers=headers)  # Corrected endpoint for files
     
     if response.status_code == 200:
         files = response.json()
@@ -36,7 +36,7 @@ def review_code(diff, openai_api_key):
     
     if response.status_code == 200:
         ai_response = response.json()
-        return ai_response['choices'][0]['text']
+        return ai_response['choices'][0]['text'].strip()  # Stripping leading/trailing whitespace
     else:
         raise Exception(f"Failed to get AI review: {response.status_code}, {response.text}")
 
@@ -57,8 +57,8 @@ def post_comment(pr_url, comment, github_token):
 
 def main():
     # Fetch necessary environment variables
-    pr_url = "https://api.github.com/repos/owner/repo/pulls/PR_NUMBER"
-    github_token = os.getenv("GITHUB_TOKEN")
+    pr_url = os.getenv("GITHUB_PR_URL")  # Use an environment variable for PR URL
+    github_token = os.getenv("AI_Code_Reviewer")  # Use your custom token secret
     openai_api_key = os.getenv("OPENAI_API_KEY")
     
     # Fetch the PR diff
