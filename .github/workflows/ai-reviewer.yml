@@ -29,4 +29,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_PR_URL: ${{ github.event.pull_request.url }}
-        run: python3 ai_code_reviewer.py
+        run: python3 scripts/ai_code_reviewer.py
