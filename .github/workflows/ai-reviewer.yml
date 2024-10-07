@@ -2,26 +2,31 @@ name: AI Code Reviewer
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, edited]
 
 jobs:
-  review:
+  ai-review:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v2
 
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
+        python-version: '3.x'  # Replace with your desired Python version
 
     - name: Install dependencies
-      run: pip install requests openai
+      run: |
+        pip install requests
+
+    - name: Debug PR URL
+      run: echo "PR URL: ${{ github.event.pull_request.url }}"
 
     - name: Run AI Code Reviewer
-      run: python3 scripts/ai_code_reviewer.py  # Adjust path if needed
       env:
-        AI_Code_Reviewer: ${{ secrets.AI_Code_Reviewer }}  # Updated secret name for GitHub token
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # OpenAI API Key
+        GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}  # Your GitHub token
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # Your OpenAI API key
+        GITHUB_PR_URL: ${{ github.event.pull_request.url }}  # Set PR URL here
+      run: python3 scripts/ai_code_reviewer.py
