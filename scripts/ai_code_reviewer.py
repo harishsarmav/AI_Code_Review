@@ -57,16 +57,20 @@ def post_comment(pr_url, comment, github_token):
 
 def main():
     # Fetch necessary environment variables
-    pr_url = os.getenv("GITHUB_PR_URL")  # Use an environment variable for PR URL
-    github_token = os.getenv("AI_Code_Reviewer")  # Use your custom token secret
+    pr_url = os.getenv("GITHUB_PR_URL")
+    github_token = os.getenv("AI_Code_Reviewer")
     openai_api_key = os.getenv("OPENAI_API_KEY")
+    
+    if not all([pr_url, github_token, openai_api_key]):
+        print("Error: Missing environment variables")
+        return
     
     # Fetch the PR diff
     try:
         diff = fetch_diff(pr_url, github_token)
         print("PR diff fetched successfully.")
     except Exception as e:
-        print(e)
+        print(f"Error fetching PR diff: {e}")
         return
     
     # Get AI code review from OpenAI
@@ -74,7 +78,7 @@ def main():
         ai_review = review_code(diff, openai_api_key)
         print("AI review completed.")
     except Exception as e:
-        print(e)
+        print(f"Error getting AI review: {e}")
         return
     
     # Post AI review comments to the PR
@@ -82,7 +86,7 @@ def main():
         post_comment(pr_url, ai_review, github_token)
         print("AI review comments posted successfully.")
     except Exception as e:
-        print(e)
+        print(f"Error posting comment: {e}")
 
 if __name__ == "__main__":
     main()
