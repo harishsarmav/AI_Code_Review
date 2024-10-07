@@ -21,7 +21,7 @@ jobs:
       run: pip install requests openai
 
     - name: Run AI Code Reviewer
-      run: python3 ai_code_reviewer.py  # Adjust path if needed
+      run: python3 scripts/ai_code_reviewer.py  # Adjust path if needed
       env:
         AI_Code_Reviewer: ${{ secrets.AI_Code_Reviewer }}  # Updated secret name for GitHub token
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}  # OpenAI API Key
