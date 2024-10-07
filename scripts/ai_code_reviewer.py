@@ -58,11 +58,16 @@ def post_comment(pr_url, comment, github_token):
         'Authorization': f'token {github_token}',
         'Content-Type': 'application/json'
     }
+    
+    # Get the issue number from the PR URL
+    issue_number = pr_url.split('/')[-1]  # Extract the PR number from the URL
+    comments_url = f'https://api.github.com/repos/{os.getenv("GITHUB_REPOSITORY")}/issues/{issue_number}/comments'
+
     data = {
         "body": comment
     }
 
-    response = requests.post(f'{pr_url}/comments', headers=headers, json=data)
+    response = requests.post(comments_url, headers=headers, json=data)
     
     if response.status_code != 201:
         raise Exception(f"Failed to post comment: {response.status_code}, {response.text}")
