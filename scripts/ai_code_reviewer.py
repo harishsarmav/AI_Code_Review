@@ -50,7 +50,7 @@ def review_code(diff, openai_api_key):
         ai_response = response.json()
         return ai_response['choices'][0]['message']['content'].strip()
     else:
-        raise Exception(f"Failed to get AI review: {response.status_code}, {response.text}")
+        return None, response  # Return None and response for further processing
 
 # Post AI review comments back to the PR
 def post_comment(pr_url, comment, github_token):
@@ -66,6 +66,18 @@ def post_comment(pr_url, comment, github_token):
     
     if response.status_code != 201:
         raise Exception(f"Failed to post comment: {response.status_code}, {response.text}")
+
+# Fallback function for basic syntax checks
+def fallback_comment():
+    return (
+        "I couldn't analyze the code due to API limits or other issues. "
+        "Here are some common areas to check for errors:\n"
+        "- Ensure there are no missing semicolons or parentheses.\n"
+        "- Check for uninitialized variables.\n"
+        "- Look out for memory leaks, especially with dynamic memory allocation.\n"
+        "- Review your function declarations and definitions for consistency.\n"
+        "Please review your code and try again!"
+    )
 
 def main():
     # Fetch necessary environment variables
@@ -92,8 +104,17 @@ def main():
     
     # Get AI code review from OpenAI
     try:
-        ai_review = review_code(diff, openai_api_key)
-        print("AI review completed.")
+        ai_review, response = review_code(diff, openai_api_key)
+        if ai_review is None:
+            status_code = response.status_code
+            if status_code == 429:
+                print("Received 429 error from OpenAI. Providing fallback comments.")
+                ai_review = fallback_comment()
+            else:
+                print("Error getting AI review: ", response.json())
+                return
+        else:
+            print("AI review completed.")
     except Exception as e:
         print(f"Error getting AI review: {e}")
         return
