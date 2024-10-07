@@ -35,8 +35,16 @@ def review_code(diff, openai_api_key):
         "temperature": 0.5
     }
 
+    payload_size = len(json.dumps(data))
+    print(f"Payload Size: {payload_size} bytes")
+
+    start_time = time.time()
     response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
-    
+    end_time = time.time()
+
+    response_time = end_time - start_time
+    print(f"API Response Time: {response_time} seconds")
+
     if response.status_code == 200:
         ai_response = response.json()
         return ai_response['choices'][0]['message']['content'].strip()
@@ -52,7 +60,49 @@ def post_comment(pr_url, comment, github_token):
     data = {
         "body": comment
     }
-    
+
     response = requests.post(f'{pr_url}/comments', headers=headers, json=data)
     
     if response.status_code != 201:
+        raise Exception(f"Failed to post comment: {response.status_code}, {response.text}")
+
+def main():
+    # Fetch necessary environment variables
+    pr_url = os.getenv("GITHUB_PR_URL")
+    github_token = os.getenv("GITHUB_TOKEN")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    
+    # Debug prints
+    print(f"PR URL: {pr_url}")
+    print(f"GitHub Token: {github_token[:4]}...")  # Print partial token for security
+    print(f"OpenAI API Key: {openai_api_key[:4]}...")
+
+    if not all([pr_url, github_token, openai_api_key]):
+        print("Error: Missing environment variables")
+        return
+    
+    # Fetch the PR diff
+    try:
+        diff = fetch_diff(pr_url, github_token)
+        print("PR diff fetched successfully.")
+    except Exception as e:
+        print(f"Error fetching PR diff: {e}")
+        return
+    
+    # Get AI code review from OpenAI
+    try:
+        ai_review = review_code(diff, openai_api_key)
+        print("AI review completed.")
+    except Exception as e:
+        print(f"Error getting AI review: {e}")
+        return
+    
+    # Post AI review comments to the PR
+    try:
+        post_comment(pr_url, ai_review, github_token)
+        print("AI review comments posted successfully.")
+    except Exception as e:
+        print(f"Error posting comment: {e}")
+
+if __name__ == "__main__":
+    main()
