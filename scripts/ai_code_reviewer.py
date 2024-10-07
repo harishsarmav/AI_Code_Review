@@ -6,7 +6,7 @@ import json
 def fetch_diff(pr_url, github_token):
     headers = {
         'Authorization': f'token {github_token}',
-        'Accept': 'application/vnd.github.v3.diff'
+        'Accept': 'application/vnd.github.v3+json'
     }
     response = requests.get(pr_url + "/files", headers=headers)  # Corrected endpoint for files
     
@@ -58,9 +58,14 @@ def post_comment(pr_url, comment, github_token):
 def main():
     # Fetch necessary environment variables
     pr_url = os.getenv("GITHUB_PR_URL")
-    github_token = os.getenv("AI_Code_Reviewer")
+    github_token = os.getenv("GITHUB_TOKEN")
     openai_api_key = os.getenv("OPENAI_API_KEY")
     
+    # Debug prints
+    print(f"PR URL: {pr_url}")
+    print(f"GitHub Token: {github_token[:4]}...")  # Print partial token for security
+    print(f"OpenAI API Key: {openai_api_key[:4]}...")
+
     if not all([pr_url, github_token, openai_api_key]):
         print("Error: Missing environment variables")
         return
