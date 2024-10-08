@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests openai
-
+        
       - name: Debug PR URL
         run: |
           echo "PR URL: ${{ github.event.pull_request.url }}"

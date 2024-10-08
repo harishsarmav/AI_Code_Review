@@ -32,12 +32,14 @@ def review_code(diff, openai_api_key, retries=5):
             {"role": "system", "content": "You are a code reviewer."},
             {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}
         ],
-        "max_tokens": 1500,  # Can adjust this based on code diff size
+      
+        "max_tokens": 1500,  # Increased token limit to handle larger reviews
         "temperature": 0.5
     }
 
     # Retry logic for 429 rate limit errors
     attempt = 0
+    initial_delay = 2  # Start with a 2-second delay
     while attempt < retries:
         try:
             start_time = time.time()
@@ -52,7 +54,7 @@ def review_code(diff, openai_api_key, retries=5):
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
                 print(f"Received 429 error from OpenAI. Retrying after a delay (attempt {attempt + 1}/{retries}).")
-                time.sleep(2 ** attempt)  # Exponential backoff
+                time.sleep(initial_delay * 2 ** attempt)  # Exponential backoff, starting at 2 seconds
                 attempt += 1
             else:
                 print(f"Error from OpenAI: {response.status_code}, {response.text}")
@@ -123,8 +125,12 @@ def main():
     try:
         ai_review, response = review_code(diff, openai_api_key)
         if ai_review is None:
-            print("Error getting AI review: ", response.json())
-            return
+            if response is not None and response.status_code == 429:
+                print("Received 429 error from OpenAI. Providing fallback comments.")
+                ai_review = fallback_comment()
+            else:
+                print("Error getting AI review: ", response)
+                return
         else:
             print("AI review completed.")
     except Exception as e:
