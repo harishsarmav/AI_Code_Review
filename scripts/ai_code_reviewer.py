@@ -20,8 +20,14 @@ def fetch_diff(pr_url, github_token):
     else:
         raise Exception(f"Failed to fetch PR diff: {response.status_code}, {response.text}")
 
-# Send diff to OpenAI for review
-def review_code(diff, openai_api_key):
+# Split the diff into smaller parts for better processing
+MAX_DIFF_SIZE = 3000  # Limit diff size per API call
+
+def split_diff(diff, max_size):
+    return [diff[i:i + max_size] for i in range(0, len(diff), max_size)]
+
+# Send diff to OpenAI for review with retry mechanism and exponential backoff
+def review_code_with_retry(diff, openai_api_key, retries=3, backoff_factor=1):
     headers = {
         'Authorization': f'Bearer {openai_api_key}',
         'Content-Type': 'application/json'
@@ -36,21 +42,20 @@ def review_code(diff, openai_api_key):
         "temperature": 0.5
     }
 
-    payload_size = len(json.dumps(data))
-    print(f"Payload Size: {payload_size} bytes")
+    attempt = 0
+    while attempt < retries:
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content'].strip(), None
+        elif response.status_code == 429:
+            attempt += 1
+            wait_time = backoff_factor * (2 ** attempt)
+            print(f"Rate limit hit. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+        else:
+            return None, response  # Return None and response for further processing
 
-    start_time = time.time()
-    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
-    end_time = time.time()
-
-    response_time = end_time - start_time
-    print(f"API Response Time: {response_time} seconds")
-
-    if response.status_code == 200:
-        ai_response = response.json()
-        return ai_response['choices'][0]['message']['content'].strip()
-    else:
-        return None, response  # Return None and response for further processing
+    return None, response  # If all retries fail
 
 # Post AI review comments back to the PR
 def post_comment(pr_url, comment, github_token):
@@ -106,27 +111,35 @@ def main():
     except Exception as e:
         print(f"Error fetching PR diff: {e}")
         return
+
+    # Split the diff if it's too large
+    diffs = split_diff(diff, MAX_DIFF_SIZE)
     
-    # Get AI code review from OpenAI
-    try:
-        ai_review, response = review_code(diff, openai_api_key)
-        if ai_review is None:
-            status_code = response.status_code
-            if status_code == 429:
-                print("Received 429 error from OpenAI. Providing fallback comments.")
-                ai_review = fallback_comment()
+    # Process each part of the diff
+    full_ai_review = ""
+    for idx, part in enumerate(diffs):
+        print(f"Reviewing part {idx + 1}/{len(diffs)} of the diff.")
+        # Get AI code review from OpenAI with retry
+        try:
+            ai_review, response = review_code_with_retry(part, openai_api_key)
+            if ai_review is None:
+                status_code = response.status_code
+                if status_code == 429:
+                    print("Received 429 error from OpenAI. Providing fallback comments.")
+                    ai_review = fallback_comment()
+                else:
+                    print("Error getting AI review: ", response.json())
+                    return
             else:
-                print("Error getting AI review: ", response.json())
-                return
-        else:
-            print("AI review completed.")
-    except Exception as e:
-        print(f"Error getting AI review: {e}")
-        return
-    
+                print("AI review completed for part", idx + 1)
+            full_ai_review += f"\nPart {idx + 1} Review:\n{ai_review}\n"
+        except Exception as e:
+            print(f"Error getting AI review for part {idx + 1}: {e}")
+            return
+
     # Post AI review comments to the PR
     try:
-        post_comment(pr_url, ai_review, github_token)
+        post_comment(pr_url, full_ai_review, github_token)
         print("AI review comments posted successfully.")
     except Exception as e:
         print(f"Error posting comment: {e}")
