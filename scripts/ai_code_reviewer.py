@@ -27,18 +27,17 @@ def review_code(diff, openai_api_key, retries=5):
         'Content-Type': 'application/json'
     }
     data = {
-        "model": "gpt-3.5-turbo-instruct-0914",  # Switch to a model with higher token processing capability
+        "model": "gpt-3.5-turbo-instruct-0914",  # Model with better request limits
         "messages": [
             {"role": "system", "content": "You are a code reviewer."},
             {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}
         ],
-        "max_tokens": 1500,  # Ensure token limit is reasonable
+        "max_tokens": 1500,  # Monitor token usage to avoid hitting limits
         "temperature": 0.5
     }
 
-    # Retry logic for 429 rate limit errors
     attempt = 0
-    initial_delay = 10  # Start with a 10-second delay
+    initial_delay = 60  # Start with a 60-second delay
     while attempt < retries:
         try:
             start_time = time.time()
@@ -50,20 +49,23 @@ def review_code(diff, openai_api_key, retries=5):
 
             if response.status_code == 200:
                 ai_response = response.json()
+                print(f"Used tokens: {ai_response['usage']['total_tokens']}")  # Monitor token usage
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
-                print(f"Received 429 error from OpenAI. Retrying after a delay (attempt {attempt + 1}/{retries}).")
-                time.sleep(initial_delay * 2 ** attempt)  # Exponential backoff, now with larger delays
+                # Check the rate-limit reset time from headers, if available
+                reset_time = response.headers.get('Retry-After', initial_delay)
+                print(f"Received 429 error from OpenAI. Retrying after {reset_time} seconds (attempt {attempt + 1}/{retries}).")
+                time.sleep(int(reset_time))  # Wait for the suggested time or fallback to initial delay
                 attempt += 1
             else:
                 print(f"Error from OpenAI: {response.status_code}, {response.text}")
-                return None, response
+                return None
         except requests.exceptions.RequestException as e:
             print(f"Request failed: {e}")
-            return None, None
+            return None
 
     print("Exceeded retry limit. Falling back to manual review suggestions.")
-    return fallback_comment(), None
+    return None
 
 # Post AI review comments back to the PR
 def post_comment(pr_url, comment, github_token):
@@ -122,14 +124,10 @@ def main():
     
     # Get AI code review from OpenAI
     try:
-        ai_review, response = review_code(diff, openai_api_key)
+        ai_review = review_code(diff, openai_api_key)
         if ai_review is None:
-            if response is not None and response.status_code == 429:
-                print("Received 429 error from OpenAI. Providing fallback comments.")
-                ai_review = fallback_comment()
-            else:
-                print("Error getting AI review: ", response)
-                return
+            ai_review = fallback_comment()
+            print("Received 429 error from OpenAI. Providing fallback comments.")
         else:
             print("AI review completed.")
     except Exception as e:
