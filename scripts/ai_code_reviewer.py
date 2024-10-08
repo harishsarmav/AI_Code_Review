@@ -27,19 +27,18 @@ def review_code(diff, openai_api_key, retries=5):
         'Content-Type': 'application/json'
     }
     data = {
-        "model": "gpt-3.5-turbo-16k",  # Updated to gpt-3.5-turbo-16k for larger token capacity
+        "model": "gpt-3.5-turbo-instruct-0914",  # Switch to a model with higher token processing capability
         "messages": [
             {"role": "system", "content": "You are a code reviewer."},
             {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}
         ],
-      
-        "max_tokens": 1500,  # Increased token limit to handle larger reviews
+        "max_tokens": 1500,  # Ensure token limit is reasonable
         "temperature": 0.5
     }
 
     # Retry logic for 429 rate limit errors
     attempt = 0
-    initial_delay = 2  # Start with a 2-second delay
+    initial_delay = 10  # Start with a 10-second delay
     while attempt < retries:
         try:
             start_time = time.time()
@@ -54,7 +53,7 @@ def review_code(diff, openai_api_key, retries=5):
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
                 print(f"Received 429 error from OpenAI. Retrying after a delay (attempt {attempt + 1}/{retries}).")
-                time.sleep(initial_delay * 2 ** attempt)  # Exponential backoff, starting at 2 seconds
+                time.sleep(initial_delay * 2 ** attempt)  # Exponential backoff, now with larger delays
                 attempt += 1
             else:
                 print(f"Error from OpenAI: {response.status_code}, {response.text}")
