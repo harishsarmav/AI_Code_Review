@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import time
+import math
 
 # Fetch the PR diff using GitHub API
 def fetch_diff(pr_url, github_token):
@@ -32,12 +33,13 @@ def review_code(diff, openai_api_key, retries=5):
             {"role": "system", "content": "You are a code reviewer."},
             {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}
         ],
-        "max_tokens": 1500,  # Monitor token usage to avoid hitting limits
+        "max_tokens": 1000,  # Lowering token usage to avoid hitting limits
         "temperature": 0.5
     }
 
     attempt = 0
-    initial_delay = 60  # Start with a 60-second delay
+    delay = 60  # Initial delay
+    max_delay = 600  # Maximum delay to avoid long waiting
     while attempt < retries:
         try:
             start_time = time.time()
@@ -52,11 +54,12 @@ def review_code(diff, openai_api_key, retries=5):
                 print(f"Used tokens: {ai_response['usage']['total_tokens']}")  # Monitor token usage
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
-                # Check the rate-limit reset time from headers, if available
-                reset_time = response.headers.get('Retry-After', initial_delay)
-                print(f"Received 429 error from OpenAI. Retrying after {reset_time} seconds (attempt {attempt + 1}/{retries}).")
-                time.sleep(int(reset_time))  # Wait for the suggested time or fallback to initial delay
+                # Check rate-limit reset time from headers, if available
+                reset_time = response.headers.get('Retry-After', delay)
+                print(f"Received 429 error. Retrying after {reset_time} seconds (attempt {attempt + 1}/{retries}).")
+                time.sleep(min(int(reset_time), max_delay))  # Exponential backoff with max delay
                 attempt += 1
+                delay = min(delay * 2, max_delay)  # Exponentially increase delay
             else:
                 print(f"Error from OpenAI: {response.status_code}, {response.text}")
                 return None
