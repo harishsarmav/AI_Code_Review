@@ -31,6 +31,7 @@ int main() {
     Rectangle *rect = new Rectangle(width, height);
     cout << "The area is: " << rect->area() << endl;
 
+    int max = 0;
     
     // Intentionally missing delete statement
     saveAreaToFile(rect);
