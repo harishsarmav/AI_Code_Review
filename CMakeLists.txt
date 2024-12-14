@@ -3,11 +3,12 @@ cmake_minimum_required(VERSION 3.10)
 # Project name
 project(MyCppProject)
 
-# C++ standard
+# Specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Source files
-file(GLOB SOURCES "src/*.cpp")
+# Automatically find all .cpp files in the current directory
+file(GLOB_RECURSE SOURCES "*.cpp")
 
-# Add executable
+# Add the executable
 add_executable(MyCppExecutable ${SOURCES})
