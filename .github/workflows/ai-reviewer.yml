@@ -1,44 +1,31 @@
-name: OpenAI Reviewer
-
-permissions:
-  contents: read
-  pull-requests: write
+name: AI Code Reviewer
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-
-concurrency:
-  group: ${{ github.repository }}-${{ github.event.number || github.head_ref || github.sha }}-${{ github.workflow }}-pr
-  cancel-in-progress: true
+  pull_request:
+    types: [opened, edited, synchronize]
 
 jobs:
   review:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # Checkout the pull request code
-      - name: Checkout PR Code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      # Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
 
-      # Install dependencies
       - name: Install dependencies
+        run: pip install requests openai
+        
+      - name: Debug PR URL
         run: |
-          pip install openai
-          pip install PyGithub
-
-      # Run the AI Code Reviewer script
-      - name: Run AI Code Review
-        run: python3 scripts/ai_code_reviewer.py
+          echo "PR URL: ${{ github.event.pull_request.url }}"
+      - name: Run AI Code Reviewer
         env:
           GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
-          API_KEY: ${{ secrets.API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.API_KEY }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.url }}
+        run: python3 scripts/ai_code_reviewer.py
