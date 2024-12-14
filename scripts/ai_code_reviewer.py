@@ -3,143 +3,64 @@ import requests
 import json
 import time
 
-# Fetch the PR diff using GitHub API
 def fetch_diff(pr_url, github_token):
-    headers = {
-        'Authorization': f'token {github_token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
+    headers = {'Authorization': f'token {github_token}', 'Accept': 'application/vnd.github.v3+json'}
     response = requests.get(pr_url + "/files", headers=headers)
-    
-    if response.status_code == 200:
-        files = response.json()
-        diff_content = ""
-        for file in files:
-            diff_content += file.get('patch', '')
-        return diff_content
-    else:
-        raise Exception(f"Failed to fetch PR diff: {response.status_code}, {response.text}")
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch PR diff. Status: {response.status_code}, URL: {pr_url}, Response: {response.text}")
+    files = response.json()
+    return ''.join(file.get('patch', '') for file in files)
 
-# Send diff to OpenAI for review
 def review_code(diff, openai_api_key, retries=5):
-    headers = {
-        'Authorization': f'Bearer {openai_api_key}',
-        'Content-Type': 'application/json'
-    }
+    headers = {'Authorization': f'Bearer {openai_api_key}', 'Content-Type': 'application/json'}
     data = {
-        "model": "gpt-3.5-turbo-instruct-0914",  # Use a model with higher request limits
-        "messages": [
-            {"role": "system", "content": "You are a code reviewer."},
-            {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}
-        ],
-        "max_tokens": 800,  # Lower the token usage further
-        "temperature": 0.5
+        "model": "gpt-3.5-turbo-instruct-0914",
+        "messages": [{"role": "system", "content": "You are a code reviewer."},
+                     {"role": "user", "content": f"Review the following code diff and suggest improvements:\n{diff}"}],
+        "max_tokens": 800, "temperature": 0.5
     }
-
     for attempt in range(retries):
         try:
-            start_time = time.time()
             response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
-            end_time = time.time()
-
-            response_time = end_time - start_time
-            print(f"API Response Time: {response_time} seconds")
-
             if response.status_code == 200:
                 ai_response = response.json()
-                print(f"Used tokens: {ai_response['usage']['total_tokens']}")  # Monitor token usage
+                print(f"OpenAI API Usage: {ai_response.get('usage', {})}")
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
-                retry_after = response.headers.get('Retry-After')
-                if retry_after:
-                    wait_time = int(retry_after)
-                else:
-                    wait_time = min(60 * (2 ** attempt), 300)  # Exponential backoff with a maximum delay of 5 minutes
-                print(f"Received 429 error. Retrying after {wait_time} seconds (attempt {attempt + 1}/{retries}).")
+                wait_time = int(response.headers.get('Retry-After', 10))
+                print(f"Rate limit exceeded. Retrying after {wait_time}s...")
                 time.sleep(wait_time)
             else:
-                print(f"Error from OpenAI: {response.status_code}, {response.text}")
-                return None
-        except requests.exceptions.RequestException as e:
+                raise Exception(f"OpenAI Error: {response.status_code}, {response.text}")
+        except Exception as e:
             print(f"Request failed: {e}")
-            return None
+    return "Fallback comments due to API issues."
 
-    print("Exceeded retry limit. Falling back to manual review suggestions.")
-    return None
-
-# Post AI review comments back to the PR
 def post_comment(pr_url, comment, github_token):
-    headers = {
-        'Authorization': f'token {github_token}',
-        'Content-Type': 'application/json'
-    }
-    
-    # Get the issue number from the PR URL
-    issue_number = pr_url.split('/')[-1]  # Extract the PR number from the URL
-    comments_url = f'https://api.github.com/repos/{os.getenv("GITHUB_REPOSITORY")}/issues/{issue_number}/comments'
-
-    data = {
-        "body": comment
-    }
-
-    response = requests.post(comments_url, headers=headers, json=data)
-    
+    issue_number = pr_url.split('/')[-1]
+    comments_url = f"https://api.github.com/repos/{os.getenv('GITHUB_REPOSITORY')}/issues/{issue_number}/comments"
+    headers = {'Authorization': f'token {github_token}', 'Content-Type': 'application/json'}
+    response = requests.post(comments_url, headers=headers, json={"body": comment})
     if response.status_code != 201:
         raise Exception(f"Failed to post comment: {response.status_code}, {response.text}")
 
-# Fallback function for basic syntax checks
-def fallback_comment():
-    return (
-        "I couldn't analyze the code due to API limits or other issues. "
-        "Here are some common areas to check for errors:\n"
-        "- Ensure there are no missing semicolons or parentheses.\n"
-        "- Check for uninitialized variables.\n"
-        "- Look out for memory leaks, especially with dynamic memory allocation.\n"
-        "- Review your function declarations and definitions for consistency.\n"
-        "Please review your code and try again!"
-    )
-
 def main():
-    # Fetch necessary environment variables
     pr_url = os.getenv("GITHUB_PR_URL")
     github_token = os.getenv("GITHUB_TOKEN")
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    
-    # Debug prints
-    print(f"PR URL: {pr_url}")
-    print(f"GitHub Token: {github_token[:4]}...")  # Print partial token for security
-    print(f"OpenAI API Key: {openai_api_key[:4]}...")
-
+    print(f"PR URL: {pr_url if pr_url else 'Not provided'}")
+    print(f"GitHub Token: {'Provided' if github_token else 'Missing'}")
+    print(f"OpenAI API Key: {'Provided' if openai_api_key else 'Missing'}")
     if not all([pr_url, github_token, openai_api_key]):
-        print("Error: Missing environment variables")
+        print("Error: Missing environment variables.")
         return
-    
-    # Fetch the PR diff
     try:
         diff = fetch_diff(pr_url, github_token)
-        print("PR diff fetched successfully.")
-    except Exception as e:
-        print(f"Error fetching PR diff: {e}")
-        return
-    
-    # Get AI code review from OpenAI
-    try:
-        ai_review = review_code(diff, openai_api_key)
-        if ai_review is None:
-            ai_review = fallback_comment()
-            print("Received 429 error from OpenAI. Providing fallback comments.")
-        else:
-            print("AI review completed.")
-    except Exception as e:
-        print(f"Error getting AI review: {e}")
-        ai_review = fallback_comment()
-
-    # Post AI review comments to the PR
-    try:
+        ai_review = review_code(diff, openai_api_key) or "Fallback comments."
         post_comment(pr_url, ai_review, github_token)
-        print("AI review comments posted successfully.")
+        print("AI review posted successfully.")
     except Exception as e:
-        print(f"Error posting comment: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
