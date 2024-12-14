@@ -36,4 +36,6 @@ int main() {
     saveAreaToFile(rect);
     
     return 0; // Memory leak: 'rect' not deleted..
+
+Asad
 }
