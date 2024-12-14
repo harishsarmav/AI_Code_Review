@@ -40,5 +40,5 @@ jobs:
       - name: Run AI Code Review
         run: python3 scripts/ai_code_reviewer.py
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
           API_KEY: ${{ secrets.API_KEY }}
