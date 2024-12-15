@@ -15,7 +15,7 @@ def fetch_diff(pr_url, github_token):
     except requests.RequestException as e:
         raise Exception(f"Error fetching PR diff: {e}")
 
-def review_code(diff, openai_api_key, retries=3, delay=10):  # Increased delay to 10 seconds
+def review_code(diff, openai_api_key, retries=3, delay=10):
     """Sends the diff to the OpenAI API for review and retrieves comments."""
     headers = {'Authorization': f'Bearer {openai_api_key}', 'Content-Type': 'application/json'}
     data = {
@@ -40,14 +40,31 @@ def review_code(diff, openai_api_key, retries=3, delay=10):  # Increased delay t
                 print(f"OpenAI API Usage: {ai_response.get('usage', {})}")
                 return ai_response['choices'][0]['message']['content'].strip()
             elif response.status_code == 429:
-                print(f"Rate limit exceeded. Retrying in {delay}s...")
-                time.sleep(delay)
+                # Check rate limit and calculate wait time
+                remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
+                reset_time = int(response.headers.get('X-RateLimit-Reset', time.time()))
+                
+                if remaining == 0:
+                    wait_time = max(reset_time - time.time(), delay)
+                    print(f"Rate limit exceeded. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)  # Wait until the rate limit resets
+                else:
+                    print(f"Rate limit exceeded. Retrying in {delay}s...")
+                    time.sleep(delay)  # Wait for a fixed delay before retrying
             else:
                 raise Exception(f"OpenAI Error: {response.status_code}, {response.text}")
         except Exception as e:
             print(f"Attempt {attempt}/{retries} failed: {e}")
 
-    return "Fallback comments due to API issues."
+     # Fallback response when API fails after retries
+    return (
+        "AI review unavailable at the moment. Here are some general suggestions:\n\n"
+        "1. Ensure proper error handling is in place for edge cases.\n"
+        "2. Refactor complex functions into smaller, reusable methods.\n"
+        "3. Add comments where the logic might be unclear to others.\n"
+        "4. Check for any potential memory leaks or performance issues.\n"
+        "5. Follow coding standards and naming conventions for consistency."
+    )
 
 def post_comment(pr_url, comment, github_token):
     """Posts a comment to the pull request on GitHub."""
