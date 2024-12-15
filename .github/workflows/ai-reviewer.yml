@@ -20,14 +20,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests openai
 
-      - name: Debug Environment Variables
+      - name: Validate Secrets
         run: |
-          echo "PR URL: ${{ github.event.pull_request.url }}"
-          echo "GitHub Token: ${GITHUB_TOKEN:+Provided}"
-          echo "OpenAI API Key: ${OPENAI_API_KEY:+Provided}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          if [ -z "${{ secrets.AI_Code_Reviewer }}" ] || [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "Missing required secrets (AI_Code_Reviewer or OPENAI_API_KEY). Exiting."
+            exit 1
+          fi
+          echo "All required secrets are available."
 
       - name: Run AI Code Reviewer
         env:
