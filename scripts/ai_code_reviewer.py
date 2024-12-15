@@ -48,8 +48,9 @@ def review_code(diff, openai_api_key, retries=3, delay=5):
 def post_comment(pr_url, comment, github_token):
     """Posts a comment to the pull request on GitHub."""
     try:
+        repo = os.getenv('GITHUB_REPOSITORY')
         issue_number = pr_url.split('/')[-1]
-        comments_url = f"https://api.github.com/repos/{os.getenv('GITHUB_REPOSITORY')}/issues/{issue_number}/comments"
+        comments_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments"
         headers = {'Authorization': f'token {github_token}', 'Content-Type': 'application/json'}
         response = requests.post(comments_url, headers=headers, json={"body": comment})
         response.raise_for_status()
@@ -57,13 +58,11 @@ def post_comment(pr_url, comment, github_token):
     except requests.RequestException as e:
         raise Exception(f"Error posting comment: {e}")
 
-
 def validate_environment_variables(*vars):
     """Validates the presence of required environment variables."""
     missing_vars = [var for var in vars if not os.getenv(var)]
     if missing_vars:
         raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
-
 
 def main():
     """Main function to fetch PR diff, review code, and post comments."""
@@ -97,7 +96,6 @@ def main():
         print(f"Environment Error: {env_err}")
     except Exception as e:
         print(f"Error: {e}")
-
 
 if __name__ == "__main__":
     main()
