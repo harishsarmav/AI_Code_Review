@@ -1,31 +1,65 @@
 name: AI Code Reviewer
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   pull_request:
     types: [opened, edited, synchronize]
 
+concurrency:
+  group: ${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
-    
+
     steps:
+      # Step 1: Checkout repository
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
+      # Step 2: Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.10'
 
+      # Step 3: Install dependencies for custom AI reviewer
       - name: Install dependencies
-        run: pip install requests openai
-        
-      - name: Debug PR URL
+        if: ${{ secrets.CUSTOM_SCRIPT_ENABLED }}
+        run: |
+          pip install requests openai
+          echo "Dependencies installed"
+
+      # Step 4: Debug PR URL and env variables
+      - name: Debug Environment Variables
         run: |
           echo "PR URL: ${{ github.event.pull_request.url }}"
-      - name: Run AI Code Reviewer
+          echo "Repository: ${{ github.repository }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "GITHUB_TOKEN: ${# secrets.GITHUB_TOKEN}} characters long"
+          echo "OpenAI Key: ${# secrets.OPENAI_API_KEY}} characters long"
+
+      # Step 5: Run Custom AI Reviewer (Optional)
+      - name: Run Custom AI Code Reviewer
+        if: ${{ secrets.CUSTOM_SCRIPT_ENABLED }}
         env:
           GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
-          OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_PR_URL: ${{ github.event.pull_request.url }}
         run: python3 scripts/ai_code_reviewer.py
+
+      # Step 6: Run Prebuilt AI Reviewer as Fallback
+      - name: Run Prebuilt AI Code Reviewer
+        if: ${{ !secrets.CUSTOM_SCRIPT_ENABLED }}
+        uses: coderabbitai/ai-pr-reviewer@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          debug: false
+          review_simple_changes: true
+          review_comment_lgtm: true
