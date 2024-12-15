@@ -15,7 +15,7 @@ def fetch_diff(pr_url, github_token):
     except requests.RequestException as e:
         raise Exception(f"Error fetching PR diff: {e}")
 
-def review_code(diff, openai_api_key, retries=3, delay=5):
+def review_code(diff, openai_api_key, retries=3, delay=10):  # Increased delay to 10 seconds
     """Sends the diff to the OpenAI API for review and retrieves comments."""
     headers = {'Authorization': f'Bearer {openai_api_key}', 'Content-Type': 'application/json'}
     data = {
@@ -31,6 +31,10 @@ def review_code(diff, openai_api_key, retries=3, delay=5):
     for attempt in range(1, retries + 1):
         try:
             response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data)
+
+            # Print the response headers to help debug rate limits
+            print("Response Headers:", response.headers)
+
             if response.status_code == 200:
                 ai_response = response.json()
                 print(f"OpenAI API Usage: {ai_response.get('usage', {})}")
