@@ -26,6 +26,6 @@ jobs:
       - name: Run AI Code Reviewer
         env:
           GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
-          OPENAI_API_KEY: ${{ secrets.API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
           GITHUB_PR_URL: ${{ github.event.pull_request.url }}
         run: python3 scripts/ai_code_reviewer.py
