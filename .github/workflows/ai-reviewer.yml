@@ -57,7 +57,7 @@ jobs:
         if: ${{ !secrets.CUSTOM_SCRIPT_ENABLED }}
         uses: coderabbitai/ai-pr-reviewer@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AI_Code_Reviewer }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
